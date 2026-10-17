@@ -196,7 +196,7 @@ export async function buildPdf(rec) {
 
   // ---------- Abschluss ----------
   const maengel = items.filter((it) => (rec.items[it.id] || {}).status === "mangel");
-  const blockH = (final ? 46 : 68) + (rec.abschluss.notiz ? doc.splitTextToSize(rec.abschluss.notiz, PAGE_W - 2 * M).length * 4 : 0);
+  const blockH = (final && rec.abschluss.urteil ? 52 : 68) + (rec.abschluss.notiz ? doc.splitTextToSize(rec.abschluss.notiz, PAGE_W - 2 * M).length * 4 : 0);
   if (y + blockH > PAGE_H - 16) {
     doc.addPage();
     y = M;
@@ -211,6 +211,16 @@ export async function buildPdf(rec) {
   const ok = items.filter((it) => (rec.items[it.id] || {}).status === "ok").length;
   const nv = items.filter((it) => (rec.items[it.id] || {}).status === "nv").length;
   const rated = ok + maengel.length + nv;
+  const missing = (final && rec.abschluss.unvollstaendig) || [];
+  if (missing.length) {
+    doc.setFont("Barlow", "bold");
+    doc.setTextColor(...RED);
+    const lines = doc.splitTextToSize(`Unvollständig abgeschlossen – es fehlte: ${missing.join(", ")}.`, PAGE_W - 2 * M);
+    doc.text(lines, M, y);
+    y += lines.length * 4.2 + 1;
+    doc.setFont("Barlow", "normal");
+    doc.setTextColor(...INK);
+  }
   doc.text(
     rated === items.length
       ? `${items.length} Punkte geprüft: ${ok} OK, ${maengel.length} Mangel, ${nv} nicht vorhanden.`
@@ -228,7 +238,7 @@ export async function buildPdf(rec) {
     }
     y += 5;
   }
-  if (!rec.abschluss.notiz && !final) {
+  if (!rec.abschluss.notiz && (!final || missing.length)) {
     doc.setTextColor(...MUTED);
     doc.text("Notwendige Arbeiten / Bemerkungen", M, y);
     doc.setDrawColor(...RULE);

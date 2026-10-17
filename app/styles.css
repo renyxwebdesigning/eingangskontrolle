@@ -313,6 +313,11 @@ fieldset:disabled #sig { cursor: default; border-style: solid; }
 .problems p { margin: 0 0 4px; }
 .problems ul { margin: 0; padding-left: 18px; }
 .problems a { color: inherit; }
+.problems-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 12px; font-size: 14.5px; }
+.problems-actions .btn { border-color: #b33; color: #7d1717; background: #fff; }
+.problems-actions .btn:hover { background: #fff5f5; border-color: var(--bad); }
+.done-missing { max-width: 520px; margin: -14px auto 22px; padding: 10px 14px; border-radius: 8px; background: var(--bad-tint); color: #7d1717; font-size: 15px; }
+.done-mark.v-offen { background: var(--faint); }
 
 /* action bar */
 .actionbar {
@@ -342,6 +347,7 @@ fieldset:disabled #sig { cursor: default; border-style: solid; }
 .done-verdict.v-ok { color: var(--ok); }
 .done-verdict.v-bedingt { color: var(--amber); }
 .done-verdict.v-gesperrt { color: var(--bad); }
+.done-verdict.v-offen { color: var(--muted); }
 .done-meta { color: var(--muted); margin: 4px 0 26px; }
 .done-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .done-actions .btn { min-width: 170px; }
@@ -388,8 +394,9 @@ fieldset:disabled #sig { cursor: default; border-style: solid; }
   .row-actions { margin-left: auto; }
   .actionbar { gap: 12px; padding-left: 12px; padding-right: 12px; }
   .bar { display: none; }
-  #print-draft { padding: 0 12px; }
-  #print-draft .lbl-text { display: none; }
+  #print-draft, #save-draft { padding: 0 12px; }
+  #print-draft .lbl-text, #save-draft .lbl-text { display: none; }
+  .ab-progress { font-size: 14px; }
   .start-title { font-size: 34px; }
 }
 @media (max-width: 400px) {

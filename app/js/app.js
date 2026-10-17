@@ -287,7 +287,11 @@ function showKontrolle(rec) {
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="1.5"/><path d="M7 14h10v7H7z"/></svg>
         <span class="lbl-text">Drucken</span>
       </button>
-      <button class="btn primary" id="finish" type="button">Abschliessen & PDF</button>
+      <button class="btn" id="save-draft" type="button" aria-label="PDF speichern" title="Aktuellen Stand als PDF speichern">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>
+        <span class="lbl-text">PDF</span>
+      </button>
+      <button class="btn primary" id="finish" type="button">Abschliessen</button>
     </div>`}
   `;
 
@@ -348,6 +352,10 @@ function showKontrolle(rec) {
   } else {
     $("#finish").addEventListener("click", () => finish(rec));
     $("#print-draft").addEventListener("click", (e) => exportPdf(rec, "print", e.currentTarget));
+    $("#save-draft").addEventListener("click", (e) => exportPdf(rec, "save", e.currentTarget));
+    $("#problems").addEventListener("click", (e) => {
+      if (e.target.closest("#force-finish")) finish(rec, true);
+    });
   }
 
   updateSummary();
@@ -656,17 +664,25 @@ function showProblems(problems, jump) {
   box.hidden = false;
   box.innerHTML = `<p><b>Noch nicht vollständig:</b></p><ul role="list">${problems
     .map((p) => `<li><a href="${p.el}">${esc(p.text)}</a></li>`)
-    .join("")}</ul>`;
+    .join("")}</ul>
+    <div class="problems-actions">
+      <button type="button" class="btn sm" id="force-finish">Trotzdem abschliessen</button>
+      <span>Im PDF wird vermerkt, was gefehlt hat.</span>
+    </div>`;
   if (jump) {
     $(problems[0].el)?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
     toast(problems.length > 1 ? `${problems[0].text} (+${problems.length - 1} weitere)` : problems[0].text, "error");
   }
 }
 
-async function finish(rec) {
+async function finish(rec, force = false) {
   const problems = validate(rec);
-  showProblems(problems, true);
-  if (problems.length) return;
+  if (!force) {
+    showProblems(problems, true);
+    if (problems.length) return;
+  }
+  // Remember what was missing so the PDF can say so.
+  rec.abschluss.unvollstaendig = problems.map((p) => p.text);
   rec.status = "abgeschlossen";
   rec.abschluss.abgeschlossen_am = new Date().toISOString();
   await flushSave(rec);
@@ -674,7 +690,8 @@ async function finish(rec) {
 }
 
 function showDone(rec) {
-  const v = VERDICTS.find((x) => x.id === rec.abschluss.urteil);
+  const v = VERDICTS.find((x) => x.id === rec.abschluss.urteil) || { id: "offen", label: "Kein Gesamturteil" };
+  const missing = rec.abschluss.unvollstaendig || [];
   const c = counts(rec);
   history.replaceState(null, "", "#fertig");
   setHeader({ back: true, title: rec.maschine.inventarnummer, sub: machineType(rec.typ).label });
@@ -684,7 +701,8 @@ function showDone(rec) {
       <span class="done-mark v-${v.id}" aria-hidden="true"></span>
       <h1>Kontrolle abgeschlossen</h1>
       <p class="done-verdict v-${v.id}">${esc(v.label)}</p>
-      <p class="done-meta">${c.total} Punkte · ${c.mangel} Mängel · ${esc(rec.maschine.geprueft_durch)}</p>
+      <p class="done-meta">${c.done} von ${c.total} Punkten · ${c.mangel} Mängel${rec.maschine.geprueft_durch ? ` · ${esc(rec.maschine.geprueft_durch)}` : ""}</p>
+      ${missing.length ? `<p class="done-missing">Unvollständig abgeschlossen: ${missing.map(esc).join(", ")}</p>` : ""}
       <div class="done-actions">
         <button class="btn primary" id="d-pdf">PDF speichern</button>
         <button class="btn" id="d-print">Drucken</button>
