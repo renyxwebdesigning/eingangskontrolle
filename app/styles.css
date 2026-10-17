@@ -388,6 +388,8 @@ fieldset:disabled #sig { cursor: default; border-style: solid; }
   .row-actions { margin-left: auto; }
   .actionbar { gap: 12px; padding-left: 12px; padding-right: 12px; }
   .bar { display: none; }
+  #print-draft { padding: 0 12px; }
+  #print-draft .lbl-text { display: none; }
   .start-title { font-size: 34px; }
 }
 @media (max-width: 400px) {

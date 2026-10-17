@@ -283,6 +283,10 @@ function showKontrolle(rec) {
         <span class="bar"><i id="pbar"></i></span>
         <span id="ptext"></span>
       </div>
+      <button class="btn" id="print-draft" type="button" aria-label="Drucken" title="Aktuellen Stand drucken – leere Punkte zum Ausfüllen von Hand">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="1.5"/><path d="M7 14h10v7H7z"/></svg>
+        <span class="lbl-text">Drucken</span>
+      </button>
       <button class="btn primary" id="finish" type="button">Abschliessen & PDF</button>
     </div>`}
   `;
@@ -343,6 +347,7 @@ function showKontrolle(rec) {
     });
   } else {
     $("#finish").addEventListener("click", () => finish(rec));
+    $("#print-draft").addEventListener("click", (e) => exportPdf(rec, "print", e.currentTarget));
   }
 
   updateSummary();
@@ -697,11 +702,12 @@ function showDone(rec) {
 }
 
 async function exportPdf(rec, mode, btn) {
-  const label = btn ? btn.textContent : "";
+  const label = btn ? btn.innerHTML : "";
   if (btn) {
     btn.disabled = true;
     btn.textContent = "PDF wird erstellt …";
   }
+  if (rec === current && saveTimer) await flushSave(rec);
   try {
     const blob = await buildPdf(rec);
     const name = pdfFilename(rec);
@@ -713,7 +719,7 @@ async function exportPdf(rec, mode, btn) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = label;
+      btn.innerHTML = label;
     }
   }
 }

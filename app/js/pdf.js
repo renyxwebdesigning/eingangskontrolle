@@ -52,7 +52,7 @@ function fmtDate(iso) {
 export function pdfFilename(rec) {
   const inv = (rec.maschine.inventarnummer || "ohne-Nr").replace(/[^\w.-]+/g, "_");
   const d = (rec.maschine.datum || new Date().toISOString().slice(0, 10)).replace(/-/g, "");
-  return `Eingangskontrolle_${inv}_${d}.pdf`;
+  return `Eingangskontrolle_${inv}_${d}${rec.status === "abgeschlossen" ? "" : "_Entwurf"}.pdf`;
 }
 
 export async function buildPdf(rec) {
@@ -70,6 +70,14 @@ export async function buildPdf(rec) {
   const verdict = VERDICTS.find((v) => v.id === rec.abschluss.urteil);
   const sections = rec.checklist;
   const items = sections.flatMap((s) => s.items);
+  const final = rec.status === "abgeschlossen";
+
+  // Empty tick box (the Barlow font has no ballot-box glyph).
+  const box = (x, y, size = 2.6) => {
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.25);
+    doc.rect(x, y, size, size);
+  };
 
   // ---------- Kopf ----------
   const logoProps = doc.getImageProperties(a.logo);
@@ -142,7 +150,9 @@ export async function buildPdf(rec) {
       const r = rec.items[it.id] || {};
       const photos = (r.photos || []).length;
       const note = (r.note || "") + (photos ? `${r.note ? "  " : ""}[${photos} Foto${photos > 1 ? "s" : ""}]` : "");
-      body.push([String(it.nr), it.text, statusLabel(r.status), note]);
+      const row = [String(it.nr), it.text, r.status ? statusLabel(r.status) : "", note];
+      if (!r.status) row.blank = it.nv ? 3 : 2; // tick boxes to fill in by hand
+      body.push(row);
     }
   }
   doc.autoTable({
@@ -153,13 +163,28 @@ export async function buildPdf(rec) {
     theme: "plain",
     styles: { font: "Barlow", fontSize: 8.4, textColor: INK, cellPadding: { top: 0.85, bottom: 0.85, left: 1.5, right: 1.5 }, valign: "top" },
     headStyles: { fillColor: BLUE, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8.2 },
-    columnStyles: { 0: { cellWidth: 8, textColor: MUTED }, 1: { cellWidth: 72 }, 2: { cellWidth: 16, fontStyle: "bold" } },
+    columnStyles: { 0: { cellWidth: 8, textColor: MUTED }, 1: { cellWidth: 66 }, 2: { cellWidth: 24, fontStyle: "bold" } },
     didParseCell: (d) => {
-      if (d.section !== "body" || d.column.index !== 2) return;
+      if (d.section !== "body") return;
+      if (d.row.raw.blank) d.cell.styles.minCellHeight = 6.4;
+      if (d.column.index !== 2) return;
       const v = d.cell.raw;
       d.cell.styles.textColor = v === "Mangel" ? RED : v === "OK" ? GREEN : MUTED;
     },
     didDrawCell: (d) => {
+      if (d.section === "body" && d.column.index === 2 && d.row.raw.blank) {
+        const labels = ["OK", "M", "n.v."].slice(0, d.row.raw.blank);
+        let x = d.cell.x + 1.5;
+        const y0 = d.cell.y + (d.cell.height - 2.6) / 2;
+        doc.setFont("Barlow", "normal");
+        doc.setFontSize(6.6);
+        doc.setTextColor(...MUTED);
+        for (const l of labels) {
+          box(x, y0);
+          doc.text(l, x + 3.3, y0 + 2.2);
+          x += 3.3 + doc.getTextWidth(l) + 1.8;
+        }
+      }
       if (d.section === "body" && d.row.raw.length === 4 && d.column.index === 0) {
         doc.setDrawColor(...RULE);
         doc.setLineWidth(0.15);
@@ -171,7 +196,7 @@ export async function buildPdf(rec) {
 
   // ---------- Abschluss ----------
   const maengel = items.filter((it) => (rec.items[it.id] || {}).status === "mangel");
-  const blockH = 46 + (rec.abschluss.notiz ? doc.splitTextToSize(rec.abschluss.notiz, PAGE_W - 2 * M).length * 4 : 0);
+  const blockH = (final ? 46 : 68) + (rec.abschluss.notiz ? doc.splitTextToSize(rec.abschluss.notiz, PAGE_W - 2 * M).length * 4 : 0);
   if (y + blockH > PAGE_H - 16) {
     doc.addPage();
     y = M;
@@ -185,11 +210,32 @@ export async function buildPdf(rec) {
   doc.setFont("Barlow", "normal");
   const ok = items.filter((it) => (rec.items[it.id] || {}).status === "ok").length;
   const nv = items.filter((it) => (rec.items[it.id] || {}).status === "nv").length;
-  doc.text(`${items.length} Punkte geprüft: ${ok} OK, ${maengel.length} Mangel, ${nv} nicht vorhanden.`, M, y);
+  const rated = ok + maengel.length + nv;
+  doc.text(
+    rated === items.length
+      ? `${items.length} Punkte geprüft: ${ok} OK, ${maengel.length} Mangel, ${nv} nicht vorhanden.`
+      : `${rated} von ${items.length} Punkten bewertet${rated ? `: ${ok} OK, ${maengel.length} Mangel, ${nv} nicht vorhanden` : ""}.`,
+    M, y
+  );
   y += 5;
-  if (maengel.length) {
-    doc.text(`Mängel an Werkstatt gemeldet: ${rec.abschluss.gemeldet ? "Ja" : "Nein"}`, M, y);
+  if (final ? maengel.length : true) {
+    if (final) {
+      doc.text(`Mängel an Werkstatt gemeldet: ${rec.abschluss.gemeldet ? "Ja" : "Nein"}`, M, y);
+    } else {
+      box(M, y - 2.4);
+      if (rec.abschluss.gemeldet) doc.text("x", M + 0.6, y - 0.1);
+      doc.text("Mängel an Werkstattleitung / Disposition gemeldet", M + 4.4, y);
+    }
     y += 5;
+  }
+  if (!rec.abschluss.notiz && !final) {
+    doc.setTextColor(...MUTED);
+    doc.text("Notwendige Arbeiten / Bemerkungen", M, y);
+    doc.setDrawColor(...RULE);
+    doc.setLineWidth(0.25);
+    for (let i = 1; i <= 3; i++) doc.line(M, y + i * 7, PAGE_W - M, y + i * 7);
+    doc.setTextColor(...INK);
+    y += 24;
   }
   if (rec.abschluss.notiz) {
     doc.setTextColor(...MUTED);
@@ -215,9 +261,19 @@ export async function buildPdf(rec) {
   doc.line(M, y + sigH + 1, M + sigW + 10, y + sigH + 1);
   doc.setFontSize(8.5);
   doc.setTextColor(...MUTED);
-  doc.text(`${m.geprueft_durch || ""}, ${fmtDate(m.datum)}`, M, y + sigH + 5);
+  doc.text(m.geprueft_durch ? `${m.geprueft_durch}, ${fmtDate(m.datum)}` : "Name, Datum, Unterschrift", M, y + sigH + 5);
 
-  if (verdict) {
+  if (!verdict) {
+    const bx = PAGE_W - M - 80;
+    doc.setFontSize(8.5);
+    doc.text("Gesamturteil", bx, y + 4);
+    doc.setFontSize(9.5);
+    doc.setTextColor(...INK);
+    VERDICTS.forEach((v, i) => {
+      box(bx, y + 7 + i * 6.2, 3);
+      doc.text(v.label, bx + 5, y + 9.5 + i * 6.2);
+    });
+  } else {
     const bx = PAGE_W - M - 80;
     doc.setFontSize(8.5);
     doc.text("Gesamturteil", bx, y + 4);
@@ -272,13 +328,16 @@ export async function buildPdf(rec) {
 
   // ---------- Fusszeile ----------
   const pages = doc.getNumberOfPages();
-  const stamp = new Date(rec.abschluss.abgeschlossen_am || Date.now()).toLocaleString("de-CH", { dateStyle: "short", timeStyle: "short" });
+  const stamp = new Date((final && rec.abschluss.abgeschlossen_am) || Date.now()).toLocaleString("de-CH", { dateStyle: "short", timeStyle: "short" });
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
     doc.setFont("Barlow", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...MUTED);
-    doc.text(`Eberhard · Eingangskontrolle ${m.inventarnummer || ""} · erstellt ${stamp}`, M, PAGE_H - 8);
+    doc.text(
+      `Eberhard · Eingangskontrolle ${m.inventarnummer || ""} · ${final ? `erstellt ${stamp}` : `Ausdruck ${stamp} – nicht abgeschlossen`}`,
+      M, PAGE_H - 8
+    );
     doc.text(`Seite ${i} / ${pages}`, PAGE_W - M, PAGE_H - 8, { align: "right" });
   }
   return doc.output("blob");
