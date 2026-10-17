@@ -145,3 +145,14 @@ export function pref(key, value) {
   }
   return value;
 }
+
+/** Where the data lives (desktop app only). */
+export async function info() {
+  const api = desktopApi();
+  return api && api.info ? api.info() : null;
+}
+
+export function openDataFolder() {
+  const api = desktopApi();
+  if (api) api.open_data_folder();
+}

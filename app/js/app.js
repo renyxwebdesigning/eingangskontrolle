@@ -133,8 +133,14 @@ async function showHome() {
     </section>
     ${listSection("In Arbeit", open, "Keine offenen Kontrollen.")}
     ${listSection("Abgeschlossen", done, "Noch keine abgeschlossenen Kontrollen.")}
-    <p class="appinfo">${store.isDesktop() ? "Desktop-App" : "Web-App"} · Daten bleiben auf diesem Gerät</p>
+    <p class="appinfo" id="appinfo">${store.isDesktop() ? "Desktop-App" : "Web-App"} · Daten bleiben auf diesem Gerät</p>
   `;
+  store.info().then((i) => {
+    if (!i) return;
+    $("#appinfo").innerHTML = `${i.portable ? "USB-Stick-Modus · Daten auf dem Stick" : "Desktop-App · Daten auf diesem PC"} ·
+      <button type="button" class="linklike" id="open-data">Datenordner öffnen</button>`;
+    $("#open-data").addEventListener("click", store.openDataFolder);
+  }).catch(() => {});
 
   $$(".type", main).forEach((b) =>
     b.addEventListener("click", async () => {

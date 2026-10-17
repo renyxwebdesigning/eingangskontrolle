@@ -31,6 +31,14 @@ Alles wird automatisch gespeichert. Angefangene Kontrollen erscheinen auf der St
 
 Gelöschte Kontrollen landen in der Desktop-App im Ordner `papierkorb` daneben.
 
+### USB-Stick
+
+`Eingangskontrolle.exe` (Windows) bzw. `Eingangskontrolle` (Linux) einfach auf den Stick kopieren und dort starten.
+Das Programm legt daneben den Ordner `Eingangskontrolle-Daten` an und speichert **alle Kontrollen und PDFs auf dem Stick**,
+so sind sie an jedem PC dabei. Auf der Startseite steht dann „USB-Stick-Modus“.
+Der erste Start vom Stick dauert ein paar Sekunden länger (das Programm entpackt sich).
+Windows braucht die „Microsoft Edge WebView2 Runtime“ – auf Windows 10/11 ist sie normalerweise schon installiert.
+
 ## Kontrollpunkte ändern
 
 Alle Punkte stehen in `app/js/checklist.js`. Neuer Punkt = neue Zeile mit eindeutiger `id`.

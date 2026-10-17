@@ -33,7 +33,30 @@ def resource_dir():
     return Path(__file__).resolve().parent.parent / "app"
 
 
-def data_dir():
+PORTABLE_FOLDER = "Eingangskontrolle-Daten"
+
+
+def portable_dir():
+    """Data folder next to the program (e.g. on a USB stick), if writable.
+
+    Only for the packaged Windows/Linux program: inspections and PDFs then
+    travel with the stick from PC to PC.
+    """
+    if not getattr(sys, "frozen", False) or sys.platform == "darwin":
+        return None
+    d = Path(sys.executable).resolve().parent / PORTABLE_FOLDER
+    try:
+        (d / "kontrollen").mkdir(parents=True, exist_ok=True)
+        probe = d / ".schreibtest"
+        probe.write_text("ok")
+        probe.unlink()
+        return d
+    except OSError:  # e.g. installed in a read-only program folder
+        return None
+
+
+def local_dir():
+    """Per-computer folder (always on the local disk)."""
     if sys.platform == "win32":
         base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
         d = base / APP_NAME
@@ -42,8 +65,14 @@ def data_dir():
     else:
         base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
         d = base / "eingangskontrolle"
-    (d / "kontrollen").mkdir(parents=True, exist_ok=True)
-    (d / "papierkorb").mkdir(parents=True, exist_ok=True)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def data_dir():
+    d = portable_dir() or local_dir()
+    for sub in ("kontrollen", "papierkorb"):
+        (d / sub).mkdir(parents=True, exist_ok=True)
     return d
 
 
@@ -83,6 +112,7 @@ class Api:
         self._records = self._dir / "kontrollen"
         self._settings_file = self._dir / "einstellungen.json"
         self._settings = self._read_json(self._settings_file) or {}
+        self._portable = self._dir.name == PORTABLE_FOLDER
 
     # ---------- helpers (underscore = not exposed to JavaScript) ----------
 
@@ -141,7 +171,11 @@ class Api:
         try:
             start = self._settings.get("pdf_dir")
             if not start or not Path(start).is_dir():
-                start = str(documents_dir())
+                if self._portable:  # on the stick: default to its PDF folder
+                    (self._dir / "PDFs").mkdir(exist_ok=True)
+                    start = str(self._dir / "PDFs")
+                else:
+                    start = str(documents_dir())
             result = self._window.create_file_dialog(
                 SAVE_DIALOG,
                 directory=start,
@@ -171,6 +205,9 @@ class Api:
             return {"message": f"PDF geöffnet – mit {key} drucken"}
         except Exception as exc:
             return {"error": str(exc)}
+
+    def info(self):
+        return {"portable": self._portable, "data_dir": str(self._dir)}
 
     def open_data_folder(self):
         open_with_system(self._dir)
@@ -241,7 +278,7 @@ def main():
     icon = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / "icon.png"
     webview.start(
         private_mode=False,
-        storage_path=str(api._dir / "webview"),
+        storage_path=str(local_dir() / "webview"),  # browser cache stays on the PC, not the stick
         icon=str(icon) if icon.exists() else None,
         debug="--debug" in sys.argv,
     )

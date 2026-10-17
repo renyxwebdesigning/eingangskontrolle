@@ -1,6 +1,6 @@
 // Offline-Cache. Bei jeder Änderung an der App VERSION erhöhen,
 // damit Tablets die neue Version laden.
-const VERSION = "ek-3";
+const VERSION = "ek-4";
 const FILES = [
   "./", "index.html", "styles.css", "manifest.webmanifest",
   "js/app.js", "js/checklist.js", "js/pdf.js", "js/storage.js",
