@@ -7,11 +7,16 @@ HERE = Path(SPECPATH)
 ROOT = HERE.parent
 NAME = "Eingangskontrolle"
 
+EXCLUDES = ["tkinter", "PyQt5", "PyQt6", "PySide2", "PySide6", "qtpy", "numpy", "PIL", "matplotlib", "cryptography"]
+if sys.platform != "win32":
+    # Windows needs cffi for pythonnet (the .NET window of pywebview).
+    EXCLUDES += ["pycparser", "cffi"]
+
 a = Analysis(
     [str(HERE / "main.py")],
     datas=[(str(ROOT / "app"), "app"), (str(HERE / "icon.png"), ".")],
-    hiddenimports=[],
-    excludes=["tkinter", "PyQt5", "PyQt6", "PySide2", "PySide6", "qtpy", "numpy", "PIL", "matplotlib", "cryptography", "pycparser", "cffi"],
+    hiddenimports=["clr_loader", "cffi", "_cffi_backend"] if sys.platform == "win32" else [],
+    excludes=EXCLUDES,
 )
 pyz = PYZ(a.pure)
 
